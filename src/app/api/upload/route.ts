@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const apiResponse = await fetch("https://api.astria.ai/v1/generate", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer sd_HajcH448cUqEgBEbGJfy8S2cK6eRMy`,  // Use your real key
+        "Authorization": `Bearer xy`,  // Use your real key
         "Content-Type": "multipart/form-data",
       },
       body: formData,  // Astria API might require formData directly
