@@ -1,35 +1,53 @@
 "use client";
+import Image from "next/image";
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
+import axios from "axios";
 
 export default function Drop() {
-  const [image, setImage] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [personImage, setPersonImage] = useState<File | null>(null);
+  const [personPreview, setPersonPreview] = useState<string | null>(null);
+  const [garmentImage, setGarmentImage] = useState<File | null>(null);
+  const [garmentPreview, setGarmentPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
-  const onDrop = (acceptedFiles: File[]) => {
+  const onDropPerson = (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
-    setImage(file);
-    setPreview(URL.createObjectURL(file));
+    setPersonImage(file);
+    setPersonPreview(URL.createObjectURL(file));
+  };
+
+  const onDropGarment = (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    setGarmentImage(file);
+    setGarmentPreview(URL.createObjectURL(file));
   };
 
   const handleUpload = async () => {
-    if (!image) return;
+    if (!personImage || !garmentImage) return;
     setLoading(true);
 
     const formData = new FormData();
-    formData.append("file", image);
+    formData.append("personImage", personImage);
+    formData.append("garmentImage", garmentImage);
 
     try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const response = await axios.post("/api/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      if (!response.ok) throw new Error("Upload failed");
-      const data = await response.json();
-      setResult(data.processedImageUrl); // Adjust according to API response
+      if (response.status !== 200) throw new Error("Upload failed");
+
+      const data = response.data;
+      console.log("Response:", data);
+      console.log("Processed Image URL:", data.processedImageUrl);
+      // TODO: Update the state with the processed image URL
+      setResult(data.processedImageUrl);
+      // setResult(`data:image/png;base64,${data.processedImageUrl}`);
+      // const blob = new Blob([data.processedImage], { type: "image/png" });
+      // const imageUrl = URL.createObjectURL(blob);
+      // setResult(imageUrl);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -37,29 +55,80 @@ export default function Drop() {
     }
   };
 
-  const { getRootProps, getInputProps } = useDropzone({ onDrop });
+  const {
+    getRootProps: getPersonRootProps,
+    getInputProps: getPersonInputProps,
+  } = useDropzone({ onDrop: onDropPerson });
+  const {
+    getRootProps: getGarmentRootProps,
+    getInputProps: getGarmentInputProps,
+  } = useDropzone({ onDrop: onDropGarment });
 
   return (
-    <div className="p-4 border border-gray-300 rounded-lg">
-      <div
-        {...getRootProps()}
-        className="border-2 border-dashed p-6 text-center cursor-pointer"
-      >
-        <input {...getInputProps()} />
-        <p>Drag & drop an image here, or click to select</p>
+    <div className="p-4 border border-gray-700 rounded-lg mx-10">
+      <div className="flex items-center justify-start space-x-4">
+        <div
+          {...getPersonRootProps()}
+          className="border-2 border-dashed p-6 text-center cursor-pointer border-black"
+        >
+          <input {...getPersonInputProps()} />
+          <p>Drag & drop a person image here, or click to select</p>
+          {personPreview && (
+            <div className="flex justify-start items-center">
+              <Image
+                src={personPreview}
+                alt="Person Preview"
+                className="mt-4 w-72 h-72 object-contain"
+                width={300}
+                height={300}
+              />
+            </div>
+          )}
+        </div>
+        <div className="text-2xl">+</div>
+        <div
+          {...getGarmentRootProps()}
+          className="border-2 border-dashed p-6 text-center cursor-pointer border-black"
+        >
+          <input {...getGarmentInputProps()} />
+          <p>Drag & drop a garment image here, or click to select</p>
+          {garmentPreview && (
+            <div className="flex justify-start items-center">
+              <Image
+                src={garmentPreview}
+                alt="Garment Preview"
+                className="mt-4 w-72 h-72 object-contain"
+                width={300}
+                height={300}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="text-2xl">→</div>
+        {/* TODO: Add the processed image here */}
+        {result && (
+          <div className="border-2 border-dashed p-6 text-center border-black">
+            <Image
+              src={result}
+              alt="Processed Result"
+              className="mt-4 w-72 h-72 object-contain"
+              width={300}
+              height={300}
+            />
+          </div>
+        )}
       </div>
 
-      {preview && <img src={preview} alt="Preview" className="mt-4 w-40 h-40 object-cover" />}
-
-      <button
-        onClick={handleUpload}
-        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
-        disabled={loading}
-      >
-        {loading ? "Processing..." : "Upload & Process"}
-      </button>
-
-      {result && <img src={result} alt="Processed Result" className="mt-4 w-40 h-40 object-cover" />}
+      <div className="flex justify-start mt-8">
+        <button
+          onClick={handleUpload}
+          className="px-4 py-2 bg-black text-white rounded"
+          disabled={loading}
+        >
+          {loading ? "Processing..." : "Upload & Process"}
+        </button>
+      </div>
     </div>
   );
 }

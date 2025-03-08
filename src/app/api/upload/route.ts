@@ -1,51 +1,63 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import axios from "axios";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    console.log("Received upload request...");
-
+    // console.log("Request body:", req.body);
     const formData = await req.formData();
-    console.log("FormData received:", formData);
+    const personImage = formData.get("personImage") as File;
+    const garmentImage = formData.get("garmentImage") as File;
 
-    const file = formData.get("file") as File;
-    if (!file) {
-      console.error("No file uploaded");
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    if (!personImage || !garmentImage) {
+      return NextResponse.json(
+        { error: "Both images are required" },
+        { status: 400 }
+      );
     }
 
-    console.log("File received:", file.name, file.type, file.size);
+    const personBuffer = Buffer.from(await personImage.arrayBuffer());
+    const garmentBuffer = Buffer.from(await garmentImage.arrayBuffer());
 
-    // Convert file to Buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const apiFormData = new FormData();
+    apiFormData.append("person_image", new Blob([personBuffer]), personImage.name);
+    apiFormData.append("garment_image", new Blob([garmentBuffer]), garmentImage.name);
 
-    console.log("Buffer size:", buffer.length);
+    const pixelcutResponse = await axios.post(
+      'https://api.developer.pixelcut.ai/v1/try-on',
+      apiFormData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json',
+          'X-API-KEY': process.env.PIXELCUT_API_KEY!,
+        },
+      }
+    );
 
-    // 📌 Send image to Astria API
-    const apiResponse = await fetch("https://api.astria.ai/v1/generate", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer xy`,  // Use your real key
-        "Content-Type": "multipart/form-data",
-      },
-      body: formData,  // Astria API might require formData directly
+    console.log("Pixelcut API response:", pixelcutResponse.data);
+
+    if (!pixelcutResponse.data) {
+      return NextResponse.json(
+        { error: "Server Error from Backend" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      processedImageUrl: pixelcutResponse.data.processedImageUrl,
     });
-
-    console.log("Astria API response status:", apiResponse.status);
-
-    if (!apiResponse.ok) {
-      const errorText = await apiResponse.text();
-      console.error("Astria API Error:", errorText);
-      return NextResponse.json({ error: errorText }, { status: apiResponse.status });
-    }
-
-    const data = await apiResponse.json();
-    console.log("Astria API response:", data);
-
-    return NextResponse.json({ processedImageUrl: data.image_url });
-
   } catch (error) {
-    console.error("Upload Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (axios.isAxiosError(error)) {
+      console.error(
+        "Error:",
+        error.response ? error.response.data : error.message
+      );
+    } else {
+      console.error("Error:", (error as Error).message);
+    }
+    return NextResponse.json(
+      { error: "Something went wrong" },
+      { status: 500 }
+    );
   }
 }
